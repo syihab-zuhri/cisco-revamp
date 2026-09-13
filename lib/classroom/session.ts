@@ -107,6 +107,28 @@ export class ClassroomSessionStore {
       .map((participant) => clone(participant));
   }
 
+  requireMutableSessionView(sessionId: string): ClassSession {
+    return this.requireMutableSession(sessionId);
+  }
+
+  markParticipantWorking(participantId: string): ParticipantSession {
+    return this.updateParticipantStatus(participantId, "working");
+  }
+
+  markParticipantSubmitted(participantId: string): ParticipantSession {
+    return this.updateParticipantStatus(participantId, "submitted");
+  }
+
+  private updateParticipantStatus(participantId: string, status: ParticipantStatus): ParticipantSession {
+    const participant = this.participants.get(participantId);
+    if (!participant) throw new Error("Participant not found");
+    const session = this.requireMutableSession(participant.sessionId);
+    participant.status = status;
+    participant.lastSeenAt = this.now();
+    session.updatedAt = participant.lastSeenAt;
+    return clone(participant);
+  }
+
   markHostDisconnected(sessionId: string): void {
     const session = this.requireMutableSession(sessionId);
     const now = this.now();

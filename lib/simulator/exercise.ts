@@ -45,7 +45,7 @@ export function evaluateExercise(exercise: Exercise, topology: Topology): Exerci
   };
 }
 
-function validateExercise(exercise: Exercise): void {
+export function validateExercise(exercise: Exercise): void {
   if (!exercise.id || !exercise.title) throw new Error("Exercise requires id and title");
   if (!Number.isInteger(exercise.version) || exercise.version < 1) throw new Error("Exercise version must be a positive integer");
   if (!exercise.targets.length) throw new Error("Exercise requires at least one target");

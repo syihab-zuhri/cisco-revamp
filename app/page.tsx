@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { addWorkspaceDevice, createWorkspaceState, updateWorkspaceIPv4, type WorkspaceDevice } from "@/lib/simulator/editor";
@@ -105,7 +106,9 @@ export default function Home() {
             <span className="size-2 rounded-full bg-[#16a34a]" />
             <span className="text-xs font-bold uppercase tracking-wider">Host online</span>
           </div>
-          <Button variant="secondary" size="sm">Class CS-789K ↗</Button>
+          <Link href="/classroom">
+            <Button variant="secondary" size="sm">Classroom Portal ↗</Button>
+          </Link>
           <button aria-label="Open help" className="grid size-9 place-items-center border border-[#cbd5e1] text-sm font-bold transition-colors hover:border-[#e01a1a] hover:text-[#e01a1a]">?</button>
         </div>
       </header>
@@ -129,9 +132,12 @@ export default function Home() {
         <section className="flex min-w-0 flex-col">
           <div className="flex h-14 items-center justify-between border-b border-[#e2e8f0] bg-white px-5">
             <div className="flex items-center gap-1">
-              {["Topology", "Exercises", "Classroom"].map((tab) => (
+              {["Topology", "Exercises"].map((tab) => (
                 <button key={tab} onClick={() => setActiveTab(tab)} className={`border-b-2 px-4 py-4 text-xs font-bold uppercase tracking-wider transition-colors ${activeTab === tab ? "border-[#e01a1a] text-[#e01a1a]" : "border-transparent text-[#718096] hover:text-[#0a0a0a]"}`}>{tab}</button>
               ))}
+              <Link href="/classroom" className="border-b-2 border-transparent px-4 py-4 text-xs font-bold uppercase tracking-wider text-[#718096] hover:text-[#0a0a0a]">
+                Classroom ↗
+              </Link>
             </div>
             <div className="flex items-center gap-2">
               <button className="border border-[#cbd5e1] px-3 py-2 text-xs font-bold hover:border-[#0a0a0a]">↶ Undo</button>

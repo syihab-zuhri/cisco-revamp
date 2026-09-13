@@ -1,15 +1,20 @@
 import { ClassroomApi, type ApiError, type ApiResult } from "./api.ts";
 import { ClassroomSessionStore } from "./session.ts";
+import { CourseworkStore } from "./coursework.ts";
 
-type Runtime = { api: ClassroomApi };
+type Runtime = { api: ClassroomApi; store: ClassroomSessionStore; coursework: CourseworkStore };
 const runtimeKey = Symbol.for("netlab.classroom.runtime");
 type RuntimeGlobal = typeof globalThis & { [runtimeKey]?: Runtime };
 
 function runtime(): Runtime {
   const globalRuntime = globalThis as RuntimeGlobal;
   if (!globalRuntime[runtimeKey]) {
+    const store = new ClassroomSessionStore({ now: () => Date.now() });
+    const coursework = new CourseworkStore(store, { now: () => Date.now() });
     globalRuntime[runtimeKey] = {
-      api: new ClassroomApi(new ClassroomSessionStore({ now: () => Date.now() })),
+      store,
+      coursework,
+      api: new ClassroomApi(store, coursework),
     };
   }
   return globalRuntime[runtimeKey] as Runtime;

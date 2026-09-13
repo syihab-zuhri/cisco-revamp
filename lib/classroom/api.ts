@@ -1,5 +1,8 @@
 import { authorizeParticipant, authorizeRequest, hashToken } from "./security.ts";
 import { ClassroomSessionStore, hashValue, type ClassSession } from "./session.ts";
+import { CourseworkStore, type ResultProjection, type StoredExercise, type StoredSubmission, type StoredWorkspace } from "./coursework.ts";
+import type { Exercise } from "../simulator/exercise.ts";
+import type { Topology } from "../simulator/core.ts";
 
 export type ApiErrorCode = "INVALID_INPUT" | "NOT_FOUND" | "FORBIDDEN" | "CONFLICT" | "RATE_LIMITED";
 export type ApiError = { code: ApiErrorCode; message: string; details: string[]; request_id: string };
@@ -15,9 +18,11 @@ type Snapshot = { session_id: string; status: ClassSession["status"]; expires_at
 
 export class ClassroomApi {
   private readonly store: ClassroomSessionStore;
+  private readonly coursework: CourseworkStore;
 
-  constructor(store: ClassroomSessionStore) {
+  constructor(store: ClassroomSessionStore, coursework?: CourseworkStore) {
     this.store = store;
+    this.coursework = coursework ?? new CourseworkStore(store, { now: () => Date.now() });
   }
 
   async createClass(input: CreateInput): Promise<ApiResult<ClassData>> {
@@ -62,6 +67,85 @@ export class ClassroomApi {
     } catch (error) {
       return fail(this.errorCode(error), this.publicMessage(error));
     }
+  }
+
+  async createExercise(sessionId: string, exercise: Exercise, hostToken: string): Promise<ApiResult<StoredExercise>> {
+    const session = this.store.getSession(sessionId);
+    if (!session) return fail("NOT_FOUND", "Session not found");
+    if (!authorizeRequest(session, hashToken(hostToken), "host")) return fail("FORBIDDEN", "Host authorization required");
+    try {
+      return { ok: true, data: this.coursework.createExercise(sessionId, exercise) };
+    } catch (error) {
+      return fail(this.errorCode(error), this.publicMessage(error));
+    }
+  }
+
+  async startExercise(sessionId: string, exerciseId: string, hostToken: string): Promise<ApiResult<StoredExercise>> {
+    const session = this.store.getSession(sessionId);
+    if (!session) return fail("NOT_FOUND", "Session not found");
+    if (!authorizeRequest(session, hashToken(hostToken), "host")) return fail("FORBIDDEN", "Host authorization required");
+    try {
+      return { ok: true, data: this.coursework.startExercise(sessionId, exerciseId) };
+    } catch (error) {
+      return fail(this.errorCode(error), this.publicMessage(error));
+    }
+  }
+
+  async getActiveExercise(sessionId: string, actor: Actor): Promise<ApiResult<StoredExercise | null>> {
+    const session = this.store.getSession(sessionId);
+    if (!session) return fail("NOT_FOUND", "Session not found");
+    const allowed = actor.role === "host"
+      ? authorizeRequest(session, hashToken(actor.token), "host")
+      : this.isParticipantAuthorized(sessionId, actor.token);
+    if (!allowed) return fail("FORBIDDEN", "Authorization required");
+    return { ok: true, data: this.coursework.getActiveExercise(sessionId) ?? null };
+  }
+
+  async saveParticipantWorkspace(sessionId: string, payload: string, participantToken: string, expectedVersion?: number): Promise<ApiResult<StoredWorkspace>> {
+    const participant = this.store.findParticipantByTokenHash(hashToken(participantToken));
+    if (!participant || participant.sessionId !== sessionId) return fail("FORBIDDEN", "Invalid participant token");
+    try {
+      return { ok: true, data: this.coursework.saveWorkspace(participant.id, payload, expectedVersion) };
+    } catch (error) {
+      return fail(this.errorCode(error), this.publicMessage(error));
+    }
+  }
+
+  async submitParticipantWorkspace(sessionId: string, payload: string, submissionKey: string, participantToken: string, expectedVersion?: number): Promise<ApiResult<StoredSubmission>> {
+    const participant = this.store.findParticipantByTokenHash(hashToken(participantToken));
+    if (!participant || participant.sessionId !== sessionId) return fail("FORBIDDEN", "Invalid participant token");
+    try {
+      return { ok: true, data: this.coursework.submitWorkspace(participant.id, payload, submissionKey, expectedVersion) };
+    } catch (error) {
+      return fail(this.errorCode(error), this.publicMessage(error));
+    }
+  }
+
+  async getResults(sessionId: string, hostToken: string): Promise<ApiResult<ResultProjection[]>> {
+    const session = this.store.getSession(sessionId);
+    if (!session) return fail("NOT_FOUND", "Session not found");
+    if (!authorizeRequest(session, hashToken(hostToken), "host")) return fail("FORBIDDEN", "Host authorization required");
+    try {
+      return { ok: true, data: this.coursework.resultsForSession(sessionId) };
+    } catch (error) {
+      return fail(this.errorCode(error), this.publicMessage(error));
+    }
+  }
+
+  async getWorkspacePreview(sessionId: string, participantId: string, hostToken: string): Promise<ApiResult<Topology | null>> {
+    const session = this.store.getSession(sessionId);
+    if (!session) return fail("NOT_FOUND", "Session not found");
+    if (!authorizeRequest(session, hashToken(hostToken), "host")) return fail("FORBIDDEN", "Host authorization required");
+    try {
+      return { ok: true, data: this.coursework.workspacePreview(sessionId, participantId) ?? null };
+    } catch (error) {
+      return fail(this.errorCode(error), this.publicMessage(error));
+    }
+  }
+
+  private isParticipantAuthorized(sessionId: string, token: string): boolean {
+    const participant = this.store.findParticipantByTokenHash(hashToken(token));
+    return Boolean(participant && participant.sessionId === sessionId && authorizeParticipant(participant.joinTokenHash, hashToken(token)));
   }
 
   private buildSnapshot(sessionId: string): Snapshot {
