@@ -1,22 +1,31 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { addWorkspaceDevice, createWorkspaceState, updateWorkspaceIPv4, type WorkspaceDevice } from "@/lib/simulator/editor";
+import { createTopology, type DeviceType } from "@/lib/simulator/core";
 
 const devices = [
-  { type: "PC", label: "PC-0", icon: "▣", tone: "bg-[#fdf2f2] text-[#e01a1a]" },
-  { type: "SW", label: "Switch", icon: "⬡", tone: "bg-[#f1f5f9] text-[#0a0a0a]" },
-  { type: "RT", label: "Router", icon: "◈", tone: "bg-[#fef3c7] text-[#d97706]" },
-  { type: "SV", label: "Server", icon: "▤", tone: "bg-[#dbeafe] text-[#2563eb]" },
-  { type: "AP", label: "Access point", icon: "◉", tone: "bg-[#dcfce7] text-[#16a34a]" },
+  { type: "PC", domainType: "pc" as DeviceType, label: "PC", icon: "▣", tone: "bg-[#fdf2f2] text-[#e01a1a]" },
+  { type: "SW", domainType: "switch" as DeviceType, label: "Switch", icon: "⬡", tone: "bg-[#f1f5f9] text-[#0a0a0a]" },
+  { type: "RT", domainType: "router" as DeviceType, label: "Router", icon: "◈", tone: "bg-[#fef3c7] text-[#d97706]" },
+  { type: "SV", domainType: "server" as DeviceType, label: "Server", icon: "▤", tone: "bg-[#dbeafe] text-[#2563eb]" },
+  { type: "AP", domainType: "access_point" as DeviceType, label: "Access point", icon: "◉", tone: "bg-[#dcfce7] text-[#16a34a]" },
 ];
 
-const topologyNodes = [
-  { id: "pc0", name: "PC-0", kind: "PC", ip: "192.168.1.10", x: "12%", y: "28%", tone: "border-[#e01a1a] bg-[#fdf2f2] text-[#e01a1a]" },
-  { id: "switch0", name: "Switch-0", kind: "SW", ip: "—", x: "43%", y: "50%", tone: "border-[#0a0a0a] bg-white text-[#0a0a0a]" },
-  { id: "router0", name: "Router-0", kind: "RT", ip: "192.168.1.1", x: "68%", y: "27%", tone: "border-[#d97706] bg-[#fffbeb] text-[#b45309]" },
-  { id: "server0", name: "Web Server", kind: "SV", ip: "192.168.1.20", x: "82%", y: "67%", tone: "border-[#2563eb] bg-[#eff6ff] text-[#2563eb]" },
-];
+const deviceMeta: Record<DeviceType, { kind: string; tone: string; icon: string }> = {
+  pc: { kind: "PC", tone: "border-[#e01a1a] bg-[#fdf2f2] text-[#e01a1a]", icon: "▣" },
+  switch: { kind: "SW", tone: "border-[#0a0a0a] bg-white text-[#0a0a0a]", icon: "⬡" },
+  router: { kind: "RT", tone: "border-[#d97706] bg-[#fffbeb] text-[#b45309]", icon: "◈" },
+  server: { kind: "SV", tone: "border-[#2563eb] bg-[#eff6ff] text-[#2563eb]", icon: "▤" },
+  access_point: { kind: "AP", tone: "border-[#16a34a] bg-[#f0fdf4] text-[#16a34a]", icon: "◉" },
+};
+
+function initialWorkspace() {
+  let state = createWorkspaceState(createTopology());
+  for (const type of ["pc", "switch", "router", "server"] as DeviceType[]) state = addWorkspaceDevice(state, type);
+  return state;
+}
 
 const links = [
   { x1: "19%", y1: "34%", x2: "43%", y2: "52%" },
@@ -25,11 +34,22 @@ const links = [
 ];
 
 export default function Home() {
-  const [selectedDevice, setSelectedDevice] = useState("pc0");
+  const [workspace, setWorkspace] = useState(initialWorkspace);
   const [isPlaying, setIsPlaying] = useState(true);
   const [speed, setSpeed] = useState("1x");
   const [activeTab, setActiveTab] = useState("Topology");
-  const selected = topologyNodes.find((node) => node.id === selectedDevice) ?? topologyNodes[0];
+  const selected = workspace.devices.find((device) => device.id === workspace.selectedDeviceId) ?? workspace.devices[0];
+  const selectedMeta = selected ? deviceMeta[selected.type] : deviceMeta.pc;
+  const configuredCount = useMemo(() => workspace.devices.filter((device) => device.ipv4).length, [workspace.devices]);
+
+  function addDevice(type: DeviceType) {
+    setWorkspace((current) => addWorkspaceDevice(current, type));
+  }
+
+  function updateSelectedIp(address: string) {
+    if (!selected) return;
+    setWorkspace((current) => updateWorkspaceIPv4(current, selected.id, address ? { address, prefix: 24 } : undefined));
+  }
 
   return (
     <main className="min-h-screen bg-[#f8f9fa] text-[#0a0a0a]">
@@ -63,7 +83,7 @@ export default function Home() {
           <p className="mb-5 text-center text-[9px] font-bold uppercase tracking-[0.2em] text-[#94a3b8]">Devices</p>
           <div className="flex flex-col gap-3">
             {devices.map((device) => (
-              <button key={device.type} title={`Add ${device.label}`} className="group flex flex-col items-center gap-2 border border-[#27272a] px-2 py-3 text-center transition-colors hover:border-[#e01a1a]">
+              <button key={device.type} title={`Add ${device.label}`} onClick={() => addDevice(device.domainType)} className="group flex flex-col items-center gap-2 border border-[#27272a] px-2 py-3 text-center transition-colors hover:border-[#e01a1a]">
                 <span className={`grid size-10 place-items-center text-xl ${device.tone}`}>{device.icon}</span>
                 <span className="text-[9px] font-semibold leading-tight text-[#cbd5e1] group-hover:text-white">{device.label}</span>
               </button>
@@ -99,17 +119,18 @@ export default function Home() {
 
             <div className="netlab-grid relative min-h-[480px] flex-1 overflow-hidden border border-[#0a0a0a] bg-white">
               <div className="absolute left-5 top-4 flex items-center gap-2 bg-white/90 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-[#718096]">⌖ Canvas / live projection</div>
-              <div className="absolute right-5 top-4 flex items-center gap-2 border border-[#e2e8f0] bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-wider"><span className="size-2 rounded-full bg-[#16a34a]" /> 3 links up</div>
+              <div className="absolute right-5 top-4 flex items-center gap-2 border border-[#e2e8f0] bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-wider"><span className="size-2 rounded-full bg-[#16a34a]" /> {workspace.topology.links.length} links up · {configuredCount}/{workspace.devices.length} IPv4</div>
               <svg className="absolute inset-0 size-full" aria-label="Network links" role="img">
                 {links.map((link, index) => <line key={index} x1={link.x1} y1={link.y1} x2={link.x2} y2={link.y2} stroke={index === 1 ? "#e01a1a" : "#0a0a0a"} strokeWidth="2" strokeDasharray={index === 1 ? "7 5" : undefined} />)}
                 <circle cx="59%" cy="40%" r="6" fill="#e01a1a"><animate attributeName="cx" values="50%;68%;50%" dur="2.4s" repeatCount="indefinite" /><animate attributeName="cy" values="48%;32%;48%" dur="2.4s" repeatCount="indefinite" /></circle>
               </svg>
-              {topologyNodes.map((node) => (
-                <button key={node.id} onClick={() => setSelectedDevice(node.id)} className={`node-shadow absolute -translate-x-1/2 -translate-y-1/2 border-2 p-3 text-left transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#e01a1a]/30 ${node.tone} ${selectedDevice === node.id ? "ring-2 ring-[#e01a1a] ring-offset-2" : ""}`} style={{ left: node.x, top: node.y }}>
-                  <div className="flex items-center gap-2"><span className="grid size-8 place-items-center border border-current bg-white text-sm font-black">{node.kind}</span><span><span className="block text-xs font-black uppercase tracking-wide">{node.name}</span><span className="font-mono-netlab text-[9px] text-[#718096]">{node.ip}</span></span></div>
+              {workspace.devices.map((node: WorkspaceDevice) => {
+                const meta = deviceMeta[node.type];
+                return <button key={node.id} onClick={() => setWorkspace((current) => ({ ...current, selectedDeviceId: node.id }))} className={`node-shadow absolute -translate-x-1/2 -translate-y-1/2 border-2 p-3 text-left transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#e01a1a]/30 ${meta.tone} ${workspace.selectedDeviceId === node.id ? "ring-2 ring-[#e01a1a] ring-offset-2" : ""}`} style={{ left: `${node.position.x}%`, top: `${node.position.y}%` }}>
+                  <div className="flex items-center gap-2"><span className="grid size-8 place-items-center border border-current bg-white text-sm font-black">{meta.kind}</span><span><span className="block text-xs font-black uppercase tracking-wide">{node.label}</span><span className="font-mono-netlab text-[9px] text-[#718096]">{node.ipv4?.address ?? "—"}</span></span></div>
                   <span className="mt-2 flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-[#16a34a]"><span className="size-1.5 rounded-full bg-[#16a34a]" /> Link up</span>
-                </button>
-              ))}
+                </button>;
+              })}
               <div className="absolute bottom-4 left-4 bg-white/90 px-2 py-1 font-mono-netlab text-[10px] text-[#718096]">x: 42.8 / y: 18.2 / zoom: 100%</div>
               <div className="absolute bottom-4 right-4 flex gap-1 border border-[#e2e8f0] bg-white p-1"><button className="grid size-7 place-items-center text-sm hover:bg-[#f1f3f5]">−</button><button className="grid size-7 place-items-center text-sm hover:bg-[#f1f3f5]">+</button><button className="grid size-7 place-items-center text-sm hover:bg-[#f1f3f5]">⛶</button></div>
             </div>
@@ -122,8 +143,8 @@ export default function Home() {
         </section>
 
         <aside className="border-l border-[#0a0a0a] bg-white">
-          <div className="border-b border-[#0a0a0a] px-5 py-5"><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#718096]">Inspector</p><h2 className="mt-1 font-heading text-2xl font-black">{selected.name}</h2><p className="font-mono-netlab text-[10px] text-[#e01a1a]">DEVICE / {selected.kind}</p></div>
-          <div className="border-b border-[#e2e8f0] p-5"><p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-[#718096]">IPv4 configuration</p><label className="mb-2 block text-xs font-bold">IP address</label><input value={selected.ip === "—" ? "" : selected.ip} readOnly placeholder="Not configured" className="mb-4 h-10 w-full border border-[#cbd5e1] bg-[#f8f9fa] px-3 font-mono-netlab text-xs outline-none focus:border-[#e01a1a] focus:ring-2 focus:ring-[#e01a1a]/20" /><label className="mb-2 block text-xs font-bold">Subnet mask</label><input value="255.255.255.0" readOnly className="h-10 w-full border border-[#cbd5e1] bg-[#f8f9fa] px-3 font-mono-netlab text-xs outline-none" /></div>
+          <div className="border-b border-[#0a0a0a] px-5 py-5"><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#718096]">Inspector</p><h2 className="mt-1 font-heading text-2xl font-black">{selected?.label ?? "No device"}</h2><p className="font-mono-netlab text-[10px] text-[#e01a1a]">DEVICE / {selectedMeta.kind}</p></div>
+          <div className="border-b border-[#e2e8f0] p-5"><p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-[#718096]">IPv4 configuration</p><label className="mb-2 block text-xs font-bold" htmlFor="device-ip">IP address</label><input id="device-ip" value={selected?.ipv4?.address ?? ""} onChange={(event) => updateSelectedIp(event.target.value)} placeholder="Not configured" className="mb-4 h-10 w-full border border-[#cbd5e1] bg-[#f8f9fa] px-3 font-mono-netlab text-xs outline-none focus:border-[#e01a1a] focus:ring-2 focus:ring-[#e01a1a]/20" /><label className="mb-2 block text-xs font-bold" htmlFor="device-mask">Subnet mask</label><input id="device-mask" value={selected?.ipv4 ? "255.255.255.0" : ""} readOnly placeholder="Not configured" className="h-10 w-full border border-[#cbd5e1] bg-[#f8f9fa] px-3 font-mono-netlab text-xs outline-none" /></div>
           <div className="border-b border-[#e2e8f0] p-5"><div className="mb-4 flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-wider text-[#718096]">Connection status</p><span className="flex items-center gap-1 text-[10px] font-bold uppercase text-[#16a34a]"><span className="size-2 rounded-full bg-[#16a34a]" /> UP</span></div><div className="flex items-center justify-between border-b border-[#e2e8f0] py-2 text-xs"><span className="text-[#718096]">Port</span><span className="font-mono-netlab font-semibold">FastEthernet 0/1</span></div><div className="flex items-center justify-between py-2 text-xs"><span className="text-[#718096]">Gateway</span><span className="font-mono-netlab font-semibold">192.168.1.1</span></div></div>
           <div className="p-5"><p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-[#718096]">Event log</p><div className="flex flex-col gap-3 font-mono-netlab text-[10px]"><p><span className="text-[#718096]">12:04:10</span> <span className="text-[#16a34a]">OK</span> Link established</p><p><span className="text-[#718096]">12:04:12</span> <span className="text-[#e01a1a]">SEND</span> ICMP packet 01</p><p><span className="text-[#718096]">12:04:13</span> <span className="text-[#16a34a]">OK</span> Reply received · 2 hops</p></div></div>
         </aside>
