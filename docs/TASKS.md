@@ -20,7 +20,7 @@
 - [x] `TASK-P0-007` [L] Implement pure topology/device/link model. Owner: Domain. Refs: FR-010..012. Done: `lib/simulator/core.ts` provides validated device/link mutations with monotonic topology versions; duplicate/self/missing-endpoint cases are rejected and tested.
 - [x] `TASK-P0-008` [L] Implement deterministic connectivity, ping, and packet events. Owner: Domain. Refs: FR-013..016. Done: `ping()` produces ordered packet events and actionable success/failure reasons; deterministic golden tests pass.
 - [x] `TASK-P0-009` [M] Implement exercise evaluator and scoring states. Owner: Domain. Refs: FR-017..020. Done: `lib/simulator/exercise.ts` evaluates device config, active links, reachability, and device counts with deterministic scores, statuses, version evidence, and actionable feedback; 4 golden tests pass.
-- [ ] `TASK-P0-010` [M] Implement versioned serializer/migration. Owner: Domain. Refs: FR-022..024. Done when: round-trip and migration tests pass.
+- [x] `TASK-P0-010` [M] Implement versioned serializer/migration. Owner: Domain. Refs: FR-022..024. Done: `lib/simulator/workspace.ts` exports canonical schema v2 without host credentials, imports/migrates v1, validates topology references, and rejects malformed, oversized, deeply nested, unsafe, and unsupported-version payloads; 5 workspace tests pass.
 
 ## Phase 3 — Web and Realtime
 
