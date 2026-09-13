@@ -5,15 +5,15 @@
 
 ## Phase 0 — Decisions and Foundations
 
-- [ ] `TASK-P0-001` [M] Finalize runtime, database/session store, and hosting ADR. Owner: Tech Lead. Refs: ADR-001. Done when: options verified and ADR accepted.
+- [x] `TASK-P0-001` [M] Finalize runtime, database/session store, and hosting ADR. Owner: Tech Lead. Refs: ADR-001. Done: ADR-001 accepted for a Next.js 16 modular monolith with server-authoritative realtime, in-process P0 events, and in-memory temporary session store pending production persistence spike.
 - [x] `TASK-P0-002` [S] Restore/read visual reference and define DESIGN tokens. Owner: Design. Refs: DESIGN.md. Done: visual audit, canonical tokens, and WCAG contrast report recorded in `docs/DESIGN.md`.
 - [x] `TASK-P0-003` [M] Define P0 network scenario fixtures. Owner: Curriculum/Domain. Refs: FR-013..016. Done: deterministic connected-LAN, no-route, and cross-subnet-without-gateway fixtures exist in `lib/simulator/core.test.ts`; all pass.
 
 ## Phase 1 — Data, Auth, Security
 
-- [ ] `TASK-P0-004` [M] Implement session entities and expiry cleanup. Owner: Backend. Refs: ERD, FR-001..009. Done when: lifecycle tests pass.
-- [ ] `TASK-P0-005` [M] Implement host/participant token boundaries and rate limits. Owner: Security/Backend. Refs: SECURITY, NFR-004..006. Done when: auth matrix and abuse tests pass.
-- [ ] `TASK-P0-006` [S] Implement schema validation for workspace/exercise imports. Owner: Backend. Refs: FR-022..024. Done when: fuzz/negative fixtures pass.
+- [x] `TASK-P0-004` [M] Implement session entities and expiry cleanup. Owner: Backend. Refs: ERD, FR-001..009. Done: `lib/classroom/session.ts` implements temporary class lifecycle, participant join, expiry cleanup, host disconnect grace period, and closed-session mutation rejection; 5 classroom tests pass.
+- [x] `TASK-P0-005` [M] Implement host/participant token boundaries and rate limits. Owner: Security/Backend. Refs: SECURITY, NFR-004..006. Done: `lib/classroom/security.ts` hashes tokens, uses timing-safe authorization for host/participant boundaries, and enforces bounded rate limits; covered by classroom security tests.
+- [x] `TASK-P0-006` [S] Implement schema validation for workspace/exercise imports. Owner: Backend. Refs: ERD, FR-022..024. Done: `lib/simulator/workspace.ts` validates schema/version, size/depth, unsafe keys, topology references, and legacy migration before domain mutation; 5 workspace tests pass.
 
 ## Phase 2 — Core Domain
 

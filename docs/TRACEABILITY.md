@@ -5,7 +5,7 @@
 
 | Requirement | Feature/PRD | API/UI | Data | Permission | Task | Test | Status |
 |---|---|---|---|---|---|---|---|
-| FR-001..004 | CLASSROOM_SESSION | API-CLASS-001..003 | class_session | host/join | P0-004,P0-005 | TEST-CLASS-001 | Planned |
+| FR-001..004 | CLASSROOM_SESSION | API-CLASS-001..003 | class_session | host/join | P0-004,P0-005 | TEST-CLASS-001; `lib/classroom/session.test.ts` | Partially Covered (session lifecycle) |
 | FR-005..009 | CLASSROOM_SESSION | WebSocket | participant_session,realtime_event | host/owner | P0-004,P0-014 | TEST-CLASS-002,003 | Planned |
 | FR-010..016 | NETWORK_SIMULATOR | simulator canvas | workspace | owner | P0-007,P0-008,P0-011,P0-012 | TEST-SIM-001..003 | Planned |
 | FR-017..021 | EXERCISE_MODE | API-EXERCISE | exercise,submission | host/owner | P0-009,P0-013 | TEST-EX-001,002; `lib/simulator/exercise.test.ts` | Partially Covered (P0-009) |

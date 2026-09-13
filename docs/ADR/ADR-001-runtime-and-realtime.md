@@ -1,7 +1,9 @@
 # ADR-001: Modular Monolith with Server-Authoritative Realtime
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-13
+- Accepted On: 2026-09-13
+- Acceptance Evidence: Next.js 16 modular monolith scaffold is live; P0 domain tests pass; server-authoritative session boundary is implemented in `lib/classroom/session.ts` and `lib/classroom/security.ts`.
 - Owners: Product Owner, Tech Lead
 - Decision Class: Type-1
 - Related Requirements: FR-001..FR-009, FR-021, NFR-001..NFR-005
