@@ -25,7 +25,7 @@
 ## Phase 3 — Web and Realtime
 
 - [x] `TASK-P0-011` [L] Implement desktop-first simulator workspace. Owner: Frontend. Refs: FR-010..016. Done: `lib/simulator/editor.ts` provides deterministic workspace state, add/select device, and IPv4 editing; `app/page.tsx` uses live editor state for device dock, canvas nodes, selection, and inspector; editor tests and full build pass.
-- [ ] `TASK-P0-012` [M] Implement packet animation projection and controls. Owner: Frontend. Refs: FR-014..015. Done when: pause/speed/result invariance tests pass.
+- [x] `TASK-P0-012` [M] Implement packet animation projection and controls. Owner: Frontend. Refs: FR-014..015. Done: `lib/simulator/packet.ts` projects deterministic packet frames from `PingResult`; speed changes timing only, pause stops frame progression, and failed results preserve drop events; `app/page.tsx` wires PDU, pause/speed controls, active packet indicator, and event log; packet tests and full build pass.
 - [ ] `TASK-P0-013` [L] Implement teacher/student classroom flows. Owner: Frontend/Backend. Refs: FR-001..009, FR-021. Done when: E2E join-to-review passes. API foundation available: create/join/snapshot/lifecycle routes are implemented and unit-tested; UI/E2E remains.
 - [ ] `TASK-P0-014` [L] Implement WebSocket sequence, heartbeat, snapshot, reconnect. Owner: Backend. Refs: FR-005..009. Done when: disconnect/reconnect tests pass.
 - [ ] `TASK-P0-015` [M] Apply shadcn preset with diff review. Owner: Frontend. Refs: DESIGN/DSD. Done when: command output and visual smoke are recorded.

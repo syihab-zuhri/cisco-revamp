@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { addWorkspaceDevice, createWorkspaceState, updateWorkspaceIPv4, type WorkspaceDevice } from "@/lib/simulator/editor";
-import { createTopology, type DeviceType } from "@/lib/simulator/core";
+import { addLink, createTopology, ping, type DeviceType, type PingResult } from "@/lib/simulator/core";
+import { projectPacketFrames, type PacketSpeed } from "@/lib/simulator/packet";
 
 const devices = [
   { type: "PC", domainType: "pc" as DeviceType, label: "PC", icon: "▣", tone: "bg-[#fdf2f2] text-[#e01a1a]" },
@@ -24,7 +25,13 @@ const deviceMeta: Record<DeviceType, { kind: string; tone: string; icon: string 
 function initialWorkspace() {
   let state = createWorkspaceState(createTopology());
   for (const type of ["pc", "switch", "router", "server"] as DeviceType[]) state = addWorkspaceDevice(state, type);
-  return state;
+  state = updateWorkspaceIPv4(state, "pc-0", { address: "192.168.1.10", prefix: 24, gateway: "192.168.1.1" });
+  state = updateWorkspaceIPv4(state, "router-0", { address: "192.168.1.1", prefix: 24 });
+  state = updateWorkspaceIPv4(state, "server-0", { address: "192.168.1.20", prefix: 24 });
+  let topology = addLink(state.topology, { fromDeviceId: "pc-0", toDeviceId: "switch-0", fromPort: "fa0/1", toPort: "fa0/1" });
+  topology = addLink(topology, { fromDeviceId: "switch-0", toDeviceId: "router-0", fromPort: "fa0/2", toPort: "fa0/1" });
+  topology = addLink(topology, { fromDeviceId: "switch-0", toDeviceId: "server-0", fromPort: "fa0/3", toPort: "fa0/1" });
+  return { ...state, topology };
 }
 
 const links = [
@@ -33,17 +40,42 @@ const links = [
   { x1: "50%", y1: "56%", x2: "82%", y2: "66%" },
 ];
 
+const packetSpeeds: PacketSpeed[] = ["0.5x", "1x", "2x"];
+
 export default function Home() {
   const [workspace, setWorkspace] = useState(initialWorkspace);
   const [isPlaying, setIsPlaying] = useState(true);
-  const [speed, setSpeed] = useState("1x");
+  const [speed, setSpeed] = useState<PacketSpeed>("1x");
   const [activeTab, setActiveTab] = useState("Topology");
+  const [packetResult, setPacketResult] = useState<PingResult | null>(null);
+  const [packetFrameIndex, setPacketFrameIndex] = useState(0);
   const selected = workspace.devices.find((device) => device.id === workspace.selectedDeviceId) ?? workspace.devices[0];
   const selectedMeta = selected ? deviceMeta[selected.type] : deviceMeta.pc;
   const configuredCount = useMemo(() => workspace.devices.filter((device) => device.ipv4).length, [workspace.devices]);
+  const packetFrames = useMemo(() => packetResult ? projectPacketFrames(packetResult, speed) : [], [packetResult, speed]);
+  const activePacketFrame = packetFrames[packetFrameIndex] ?? packetFrames[packetFrames.length - 1];
+  const activePacketDevice = activePacketFrame ? workspace.devices.find((device) => device.id === activePacketFrame.event.deviceId) : undefined;
+
+  useEffect(() => {
+    if (!isPlaying || packetFrames.length === 0) return;
+    if (packetFrameIndex >= packetFrames.length - 1) return;
+    const timer = window.setTimeout(() => setPacketFrameIndex((index) => index + 1), Math.max(120, packetFrames[packetFrameIndex + 1].elapsedMs - packetFrames[packetFrameIndex].elapsedMs));
+    return () => window.clearTimeout(timer);
+  }, [isPlaying, packetFrameIndex, packetFrames]);
 
   function addDevice(type: DeviceType) {
     setWorkspace((current) => addWorkspaceDevice(current, type));
+  }
+
+  function runPing() {
+    try {
+      const result = ping(workspace.topology, "pc-0", "server-0");
+      setPacketResult(result);
+      setPacketFrameIndex(0);
+      setIsPlaying(true);
+    } catch {
+      setPacketResult(null);
+    }
   }
 
   function updateSelectedIp(address: string) {
@@ -104,7 +136,7 @@ export default function Home() {
             <div className="flex items-center gap-2">
               <button className="border border-[#cbd5e1] px-3 py-2 text-xs font-bold hover:border-[#0a0a0a]">↶ Undo</button>
               <button className="border border-[#cbd5e1] px-3 py-2 text-xs font-bold hover:border-[#0a0a0a]">↷ Redo</button>
-              <Button size="sm">+ Add PDU</Button>
+              <Button size="sm" onClick={runPing}>+ Add PDU</Button>
             </div>
           </div>
 
@@ -122,7 +154,7 @@ export default function Home() {
               <div className="absolute right-5 top-4 flex items-center gap-2 border border-[#e2e8f0] bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-wider"><span className="size-2 rounded-full bg-[#16a34a]" /> {workspace.topology.links.length} links up · {configuredCount}/{workspace.devices.length} IPv4</div>
               <svg className="absolute inset-0 size-full" aria-label="Network links" role="img">
                 {links.map((link, index) => <line key={index} x1={link.x1} y1={link.y1} x2={link.x2} y2={link.y2} stroke={index === 1 ? "#e01a1a" : "#0a0a0a"} strokeWidth="2" strokeDasharray={index === 1 ? "7 5" : undefined} />)}
-                <circle cx="59%" cy="40%" r="6" fill="#e01a1a"><animate attributeName="cx" values="50%;68%;50%" dur="2.4s" repeatCount="indefinite" /><animate attributeName="cy" values="48%;32%;48%" dur="2.4s" repeatCount="indefinite" /></circle>
+                {activePacketDevice && <circle cx={`${activePacketDevice.position.x}%`} cy={`${activePacketDevice.position.y}%`} r="7" fill={activePacketFrame?.event.kind === "drop" ? "#dc2626" : "#e01a1a"} stroke="#ffffff" strokeWidth="3"><animate attributeName="r" values="5;8;5" dur="0.8s" repeatCount="indefinite" /></circle>}
               </svg>
               {workspace.devices.map((node: WorkspaceDevice) => {
                 const meta = deviceMeta[node.type];
@@ -137,7 +169,7 @@ export default function Home() {
 
             <div className="mt-4 grid grid-cols-[1fr_auto] border border-[#0a0a0a] bg-[#0a0a0a] text-white">
               <div className="flex items-center gap-5 px-4 py-3"><button aria-label={isPlaying ? "Pause animation" : "Play animation"} onClick={() => setIsPlaying(!isPlaying)} className="grid size-8 place-items-center rounded-full bg-[#e01a1a] text-sm">{isPlaying ? "Ⅱ" : "▶"}</button><div><p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#94a3b8]">Packet flow</p><p className="font-mono-netlab text-xs">ICMP Echo Request <span className="text-[#e01a1a]">→</span> Router-0</p></div></div>
-              <div className="flex items-center gap-1 border-l border-[#27272a] px-3">{["0.5x", "1x", "2x"].map((option) => <button key={option} onClick={() => setSpeed(option)} className={`px-3 py-2 text-[10px] font-bold ${speed === option ? "bg-white text-[#0a0a0a]" : "text-[#94a3b8] hover:text-white"}`}>{option}</button>)}</div>
+              <div className="flex items-center gap-1 border-l border-[#27272a] px-3">{packetSpeeds.map((option) => <button key={option} onClick={() => { setSpeed(option); setPacketFrameIndex(0); }} className={`px-3 py-2 text-[10px] font-bold ${speed === option ? "bg-white text-[#0a0a0a]" : "text-[#94a3b8] hover:text-white"}`}>{option}</button>)}</div>
             </div>
           </div>
         </section>
@@ -146,7 +178,7 @@ export default function Home() {
           <div className="border-b border-[#0a0a0a] px-5 py-5"><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#718096]">Inspector</p><h2 className="mt-1 font-heading text-2xl font-black">{selected?.label ?? "No device"}</h2><p className="font-mono-netlab text-[10px] text-[#e01a1a]">DEVICE / {selectedMeta.kind}</p></div>
           <div className="border-b border-[#e2e8f0] p-5"><p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-[#718096]">IPv4 configuration</p><label className="mb-2 block text-xs font-bold" htmlFor="device-ip">IP address</label><input id="device-ip" value={selected?.ipv4?.address ?? ""} onChange={(event) => updateSelectedIp(event.target.value)} placeholder="Not configured" className="mb-4 h-10 w-full border border-[#cbd5e1] bg-[#f8f9fa] px-3 font-mono-netlab text-xs outline-none focus:border-[#e01a1a] focus:ring-2 focus:ring-[#e01a1a]/20" /><label className="mb-2 block text-xs font-bold" htmlFor="device-mask">Subnet mask</label><input id="device-mask" value={selected?.ipv4 ? "255.255.255.0" : ""} readOnly placeholder="Not configured" className="h-10 w-full border border-[#cbd5e1] bg-[#f8f9fa] px-3 font-mono-netlab text-xs outline-none" /></div>
           <div className="border-b border-[#e2e8f0] p-5"><div className="mb-4 flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-wider text-[#718096]">Connection status</p><span className="flex items-center gap-1 text-[10px] font-bold uppercase text-[#16a34a]"><span className="size-2 rounded-full bg-[#16a34a]" /> UP</span></div><div className="flex items-center justify-between border-b border-[#e2e8f0] py-2 text-xs"><span className="text-[#718096]">Port</span><span className="font-mono-netlab font-semibold">FastEthernet 0/1</span></div><div className="flex items-center justify-between py-2 text-xs"><span className="text-[#718096]">Gateway</span><span className="font-mono-netlab font-semibold">192.168.1.1</span></div></div>
-          <div className="p-5"><p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-[#718096]">Event log</p><div className="flex flex-col gap-3 font-mono-netlab text-[10px]"><p><span className="text-[#718096]">12:04:10</span> <span className="text-[#16a34a]">OK</span> Link established</p><p><span className="text-[#718096]">12:04:12</span> <span className="text-[#e01a1a]">SEND</span> ICMP packet 01</p><p><span className="text-[#718096]">12:04:13</span> <span className="text-[#16a34a]">OK</span> Reply received · 2 hops</p></div></div>
+          <div className="p-5"><p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-[#718096]">Event log</p><div className="flex flex-col gap-3 font-mono-netlab text-[10px]">{packetResult ? <>{packetResult.events.slice(0, Math.max(1, packetFrameIndex + 1)).map((event) => <p key={event.sequence}><span className="text-[#718096]">#{String(event.sequence).padStart(2, "0")}</span> <span className={event.kind === "drop" ? "text-[#dc2626]" : event.kind === "depart" ? "text-[#e01a1a]" : "text-[#16a34a]"}>{event.kind.toUpperCase()}</span> {event.detail}</p>)}<p className="border-t border-[#e2e8f0] pt-3"><span className={packetResult.status === "success" ? "text-[#16a34a]" : "text-[#dc2626]"}>{packetResult.status.toUpperCase()}</span> {packetResult.reason}</p></> : <p><span className="text-[#718096]">—</span> Run Add PDU to inspect packet events</p>}</div></div>
         </aside>
       </div>
     </main>
