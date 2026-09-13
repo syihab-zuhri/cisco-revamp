@@ -1,0 +1,76 @@
+openapi: 3.1.0
+info:
+  title: NetLab Classroom API
+  version: 0.1.0
+servers:
+  - url: /api/v1
+paths:
+  /class-sessions:
+    post:
+      operationId: createClassSession
+      summary: Create a temporary classroom session
+      responses:
+        '201': {description: Created}
+        '400': {description: Invalid input}
+        '429': {description: Rate limited}
+  /class-sessions/{sessionId}/join:
+    post:
+      operationId: joinClassSession
+      parameters:
+        - {name: sessionId, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [class_code, nickname]
+              properties:
+                class_code: {type: string, pattern: '^CS-[A-Z0-9-]+$'}
+                nickname: {type: string, minLength: 1, maxLength: 40}
+      responses:
+        '200': {description: Joined}
+        '400': {description: Invalid input}
+        '404': {description: Session unavailable}
+        '429': {description: Rate limited}
+  /workspaces/{workspaceId}:
+    put:
+      operationId: saveWorkspace
+      parameters:
+        - {name: workspaceId, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [base_version, workspace]
+              properties:
+                base_version: {type: integer, minimum: 0}
+                workspace: {type: object, additionalProperties: true}
+      responses:
+        '200': {description: Saved}
+        '409': {description: Version conflict}
+        '413': {description: Payload too large}
+  /workspaces/{workspaceId}/submit:
+    post:
+      operationId: submitWorkspace
+      parameters:
+        - {name: workspaceId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '202': {description: Submitted}
+        '409': {description: Session/exercise conflict}
+components:
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          properties:
+            code: {type: string}
+            message: {type: string}
+            request_id: {type: string}
+            details: {type: array, items: {type: object}}
