@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test --experimental-strip-types lib/simulator/**/*.test.ts"
+    "test": "node --test --experimental-strip-types lib/simulator/**/*.test.ts lib/classroom/**/*.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

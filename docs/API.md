@@ -1,6 +1,6 @@
 # API Contract
 
-> **Project:** NetLab | **Document ID:** DOC-API-001 | **Version:** 0.1.0 | **Status:** Draft
+> **Project:** NetLab | **Document ID:** DOC-API-001 | **Version:** 0.2.0 | **Status:** Implemented P0 classroom foundation
 > **Depends On:** `SRS.md`, `ERD.md`
 
 ## Principles
@@ -24,7 +24,7 @@
 | `API-CLASS-001` | POST `/api/v1/class-sessions` | TeacherHost | Create class |
 | `API-CLASS-002` | GET `/api/v1/class-sessions/{id}` | Host/Participant | Read authorized snapshot |
 | `API-CLASS-003` | POST `/api/v1/class-sessions/{id}/join` | Public participant | Join by class code |
-| `API-CLASS-004` | POST `/api/v1/class-sessions/{id}/lifecycle` | Host | Start/lock/close |
+| `API-CLASS-004` | POST `/api/v1/class-sessions/{id}/lifecycle` | Host | Disconnect/reconnect/close lifecycle |
 | `API-EXERCISE-001` | POST `/api/v1/class-sessions/{id}/exercises` | Host | Create exercise |
 | `API-EXERCISE-002` | POST `/api/v1/class-sessions/{id}/exercises/{eid}/start` | Host | Start exercise |
 | `API-WORKSPACE-001` | PUT `/api/v1/workspaces/{id}` | Owner | Save versioned workspace |

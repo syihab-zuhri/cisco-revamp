@@ -94,6 +94,19 @@ export class ClassroomSessionStore {
     return participant ? clone(participant) : undefined;
   }
 
+  findParticipantByTokenHash(tokenHash: string): ParticipantSession | undefined {
+    for (const participant of this.participants.values()) {
+      if (participant.joinTokenHash === tokenHash) return clone(participant);
+    }
+    return undefined;
+  }
+
+  listParticipants(sessionId: string): ParticipantSession[] {
+    return [...this.participants.values()]
+      .filter((participant) => participant.sessionId === sessionId)
+      .map((participant) => clone(participant));
+  }
+
   markHostDisconnected(sessionId: string): void {
     const session = this.requireMutableSession(sessionId);
     const now = this.now();
