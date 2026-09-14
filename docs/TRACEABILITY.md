@@ -10,8 +10,8 @@
 | FR-010..016 | NETWORK_SIMULATOR | simulator canvas | workspace | owner | P0-007,P0-008,P0-011,P0-012 | TEST-SIM-001..003; `lib/simulator/core.test.ts`, `lib/simulator/editor.test.ts`, `lib/simulator/packet.test.ts` | Covered (interactive workspace and deterministic packet projection; classroom integration pending) |
 | FR-017..021 | EXERCISE_MODE | API-EXERCISE | exercise,submission | host/owner | P0-009,P0-013 | TEST-EX-001,002; `lib/simulator/exercise.test.ts`, `lib/classroom/classroom-flow.test.ts` | Covered (Evaluator engine & E2E join-to-review) |
 | FR-022..026 | EXPORT_IMPORT | API-WORKSPACE/RESULT | workspace/submission | owner/host | P0-006,P0-010 | TEST-IO-001; `lib/simulator/workspace.test.ts` | Partially Covered (P0-010) |
-| NFR-001..003 | Architecture | API/WebSocket | all runtime | service | P0-014,P0-016 | performance/reconnect; `lib/classroom/realtime/protocol.test.ts` | Partially Covered (In-process sequence, buffer, and reconnect verified; scale test pending P0-016) |
-| NFR-004..006 | Security | all mutations | token/session | boundary | P0-005 | TEST-SEC-001; `lib/classroom/session.test.ts`, `lib/classroom/api.test.ts`, `lib/classroom/routes.test.ts` | Partially Covered (P0 boundary; deployment profile pending) |
-| NFR-007..012 | DSD/Runbook | UI/ops | config/logs | service | P0-015..017 | a11y/smoke | Blocked by DESIGN |
+| NFR-001..003 | Architecture | API/WebSocket | all runtime | service | P0-014,P0-016 | performance/reconnect; `lib/classroom/realtime/protocol.test.ts`; `lib/quality/smoke.test.ts` (50 concurrent joins <200ms, ping+frames <15ms) | Covered |
+| NFR-004..006 | Security | all mutations | token/session | boundary | P0-005,P0-016 | TEST-SEC-001; `lib/classroom/session.test.ts`, `lib/classroom/api.test.ts`, `lib/classroom/routes.test.ts`; `lib/quality/smoke.test.ts` (privilege escalation, prototype pollution, payload limits, token redaction) | Partially Covered (boundary + smoke verified; deployment profile pending P0-017) |
+| NFR-007..012 | DSD/Runbook | UI/ops | config/logs | service | P0-015..017 | a11y/smoke; `docs/VISUAL_SMOKE.md`; `lib/quality/smoke.test.ts` (WCAG AA contrast from live tokens) | Partially Covered (visual + a11y smoke done; ops runbook pending P0-017) |
 
 P0 coverage is not yet `Covered`; it becomes Covered only after implementation and test evidence exist.

@@ -41,6 +41,10 @@ export function importWorkspace(input: string, options: ImportOptions = {}): Top
   const byteLength = Buffer.byteLength(input, "utf8");
   if (byteLength > maxBytes) throw new Error(`Workspace payload exceeds ${maxBytes} bytes`);
 
+  if (/["'](?:__proto__|constructor|prototype)["']\s*:/.test(input)) {
+    throw new Error("Unsafe workspace key");
+  }
+
   let value: unknown;
   try {
     value = JSON.parse(input);
