@@ -34,6 +34,7 @@ export default function ClassroomPage() {
   const [results, setResults] = useState<ResultItem[]>([]);
   const [teacherLog, setTeacherLog] = useState<string[]>([]);
   const [isClassActive, setIsClassActive] = useState(false);
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
 
   // Student State
   const [joinCode, setJoinCode] = useState("CS-DEMO01");
@@ -87,6 +88,9 @@ export default function ClassroomPage() {
         });
         logTeacher(`Exercise default "Tantangan 01" diaktifkan.`);
       }
+
+      // connect live SSE stream for real-time presence/results
+      connectTeacherRealtime(data.data.id, hostToken);
     } catch (err: unknown) {
       logTeacher(`Error create: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -216,6 +220,42 @@ export default function ClassroomPage() {
     }
   }
 
+  function connectTeacherRealtime(sessionId: string, token: string) {
+    fetch("/api/v1/realtime/tickets", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      body: JSON.stringify({ session_id: sessionId, role: "host" }),
+    })
+      .then((res) => res.json())
+      .then((ticketRes) => {
+        if (!ticketRes.ok) return;
+        const source = new EventSource(`/api/v1/realtime?ticket=${ticketRes.data.ticket}`);
+        source.onopen = () => setRealtimeConnected(true);
+        source.onerror = () => setRealtimeConnected(false);
+        source.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === "participant_joined") {
+              logTeacher(`Realtime: ${data.payload.nickname} bergabung.`);
+              handleRefreshResults();
+            } else if (data.type === "submission_evaluated") {
+              logTeacher(`Realtime: Pengumpulan dinilai (${data.payload.score}/100).`);
+              handleRefreshResults();
+            } else if (data.type === "host_disconnected") {
+              logTeacher("Realtime: Host disconnected.");
+            } else if (data.type === "session_closed") {
+              setIsClassActive(false);
+              setRealtimeConnected(false);
+              source.close();
+            }
+          } catch {
+            /* ignore parse error */
+          }
+        };
+      })
+      .catch(() => undefined);
+  }
+
   function logTeacher(msg: string) {
     setTeacherLog((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev]);
   }
@@ -318,9 +358,15 @@ export default function ClassroomPage() {
                   <h3 className="text-lg font-heading font-black">Peserta & Hasil Evaluasi (Live)</h3>
                   <p className="text-xs text-[#718096]">Status pengumpulan dan skor latihan siswa secara server-authoritative.</p>
                 </div>
-                <span className="text-xs font-bold font-mono-netlab bg-[#f1f5f9] px-2.5 py-1 border border-[#e2e8f0]">
-                  {results.length} Siswa Terdaftar
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${realtimeConnected ? "bg-[#dcfce7] border-[#86efac] text-[#16a34a]" : "bg-[#f1f5f9] border-[#e2e8f0] text-[#718096]"}`}>
+                    <span className={`size-1.5 rounded-full ${realtimeConnected ? "bg-[#16a34a] animate-pulse" : "bg-[#94a3b8]"}`} />
+                    {realtimeConnected ? "Realtime SSE Aktif" : "Polling"}
+                  </span>
+                  <span className="text-xs font-bold font-mono-netlab bg-[#f1f5f9] px-2.5 py-1 border border-[#e2e8f0]">
+                    {results.length} Siswa Terdaftar
+                  </span>
+                </div>
               </div>
 
               <div className="mt-4 overflow-x-auto">

@@ -115,6 +115,13 @@ export class ClassroomSessionStore {
     return this.updateParticipantStatus(participantId, "working");
   }
 
+  touchParticipant(sessionId: string, participantId: string): ParticipantSession | undefined {
+    const participant = this.participants.get(participantId);
+    if (!participant || participant.sessionId !== sessionId) return undefined;
+    participant.lastSeenAt = this.now();
+    return clone(participant);
+  }
+
   markParticipantSubmitted(participantId: string): ParticipantSession {
     return this.updateParticipantStatus(participantId, "submitted");
   }
@@ -139,7 +146,10 @@ export class ClassroomSessionStore {
   }
 
   markHostReconnected(sessionId: string): void {
-    const session = this.requireMutableSession(sessionId);
+    const session = this.sessions.get(sessionId);
+    if (!session) throw new Error("Session not found");
+    this.reconcileSession(session, this.now());
+    if (session.status !== "host_disconnected") throw new Error(`Session is ${session.status}`);
     session.status = "active";
     session.hostDisconnectedAt = undefined;
     session.hostGraceDeadline = undefined;

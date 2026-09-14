@@ -1,8 +1,11 @@
 import { ClassroomApi, type ApiError, type ApiResult } from "./api.ts";
 import { ClassroomSessionStore } from "./session.ts";
 import { CourseworkStore } from "./coursework.ts";
+import { realtimeHub, RealtimeHub, type RealtimeEventType } from "./realtime/hub.ts";
+import { RealtimeProtocol } from "./realtime/protocol.ts";
+import { TicketStore } from "./tickets.ts";
 
-type Runtime = { api: ClassroomApi; store: ClassroomSessionStore; coursework: CourseworkStore };
+type Runtime = { api: ClassroomApi; store: ClassroomSessionStore; coursework: CourseworkStore; hub: RealtimeHub; protocol: RealtimeProtocol; tickets: TicketStore };
 const runtimeKey = Symbol.for("netlab.classroom.runtime");
 type RuntimeGlobal = typeof globalThis & { [runtimeKey]?: Runtime };
 
@@ -11,10 +14,15 @@ function runtime(): Runtime {
   if (!globalRuntime[runtimeKey]) {
     const store = new ClassroomSessionStore({ now: () => Date.now() });
     const coursework = new CourseworkStore(store, { now: () => Date.now() });
+    const hub = realtimeHub();
+    const api = new ClassroomApi(store, coursework, hub);
     globalRuntime[runtimeKey] = {
       store,
       coursework,
-      api: new ClassroomApi(store, coursework),
+      hub,
+      api,
+      protocol: new RealtimeProtocol(api, hub),
+      tickets: new TicketStore(),
     };
   }
   return globalRuntime[runtimeKey] as Runtime;
@@ -22,6 +30,18 @@ function runtime(): Runtime {
 
 export function classroomApi(): ClassroomApi {
   return runtime().api;
+}
+
+export function classroomProtocol(): RealtimeProtocol {
+  return runtime().protocol;
+}
+
+export function classroomTickets(): TicketStore {
+  return runtime().tickets;
+}
+
+export function publishToSession(sessionId: string, type: RealtimeEventType, payload: Record<string, unknown>): void {
+  runtime().hub.publish(sessionId, { type, payload });
 }
 
 export function bearerToken(request: Request): string | undefined {

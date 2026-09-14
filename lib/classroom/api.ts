@@ -3,6 +3,7 @@ import { ClassroomSessionStore, hashValue, type ClassSession } from "./session.t
 import { CourseworkStore, type ResultProjection, type StoredExercise, type StoredSubmission, type StoredWorkspace } from "./coursework.ts";
 import type { Exercise } from "../simulator/exercise.ts";
 import type { Topology } from "../simulator/core.ts";
+import type { RealtimeHub } from "./realtime/hub.ts";
 
 export type ApiErrorCode = "INVALID_INPUT" | "NOT_FOUND" | "FORBIDDEN" | "CONFLICT" | "RATE_LIMITED";
 export type ApiError = { code: ApiErrorCode; message: string; details: string[]; request_id: string };
@@ -10,7 +11,7 @@ export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: ApiError 
 
 type CreateInput = { class_code: string; host_token: string };
 type JoinInput = { class_code: string; nickname: string; join_token: string };
-type Actor = { role: "host" | "participant"; token: string };
+export type Actor = { role: "host" | "participant"; token: string };
 
 type ClassData = { id: string; status: ClassSession["status"]; expires_at: number };
 type JoinData = { id: string; nickname: string; status: string; snapshot: Snapshot };
@@ -19,10 +20,12 @@ type Snapshot = { session_id: string; status: ClassSession["status"]; expires_at
 export class ClassroomApi {
   private readonly store: ClassroomSessionStore;
   private readonly coursework: CourseworkStore;
+  private readonly hub?: RealtimeHub;
 
-  constructor(store: ClassroomSessionStore, coursework?: CourseworkStore) {
+  constructor(store: ClassroomSessionStore, coursework?: CourseworkStore, hub?: RealtimeHub) {
     this.store = store;
     this.coursework = coursework ?? new CourseworkStore(store, { now: () => Date.now() });
+    this.hub = hub;
   }
 
   async createClass(input: CreateInput): Promise<ApiResult<ClassData>> {
@@ -38,6 +41,7 @@ export class ClassroomApi {
     try {
       const participant = this.store.joinSession(sessionId, { classCode: input.class_code, nickname: input.nickname, joinToken: input.join_token });
       const snapshot = this.buildSnapshot(sessionId);
+      this.hub?.publish(sessionId, { type: "participant_joined", payload: { participant_id: participant.id, nickname: participant.nickname, status: participant.status } });
       return { ok: true, data: { id: participant.id, nickname: participant.nickname, status: participant.status, snapshot } };
     } catch (error) {
       return fail(this.errorCode(error), this.publicMessage(error));
@@ -56,6 +60,10 @@ export class ClassroomApi {
   }
 
   async changeLifecycle(sessionId: string, action: "close" | "disconnect" | "reconnect", hostToken: string): Promise<ApiResult<{ status: string }>> {
+    return this.changeLifecycleSync(sessionId, action, hostToken);
+  }
+
+  changeLifecycleSync(sessionId: string, action: "close" | "disconnect" | "reconnect", hostToken: string): ApiResult<{ status: string }> {
     const session = this.store.getSession(sessionId);
     if (!session) return fail("NOT_FOUND", "Session not found");
     if (!authorizeRequest(session, hashToken(hostToken), "host")) return fail("FORBIDDEN", "Host authorization required");
@@ -63,7 +71,10 @@ export class ClassroomApi {
       if (action === "close") this.store.closeSession(sessionId);
       if (action === "disconnect") this.store.markHostDisconnected(sessionId);
       if (action === "reconnect") this.store.markHostReconnected(sessionId);
-      return { ok: true, data: { status: this.store.getSession(sessionId)!.status } };
+      const next = this.store.getSession(sessionId)!;
+      if (action === "disconnect") this.hub?.publish(sessionId, { type: "host_disconnected", payload: { status: next.status } });
+      if (action === "close") this.hub?.publish(sessionId, { type: "session_closed", payload: { status: next.status } });
+      return { ok: true, data: { status: next.status } };
     } catch (error) {
       return fail(this.errorCode(error), this.publicMessage(error));
     }
@@ -102,10 +113,16 @@ export class ClassroomApi {
   }
 
   async saveParticipantWorkspace(sessionId: string, payload: string, participantToken: string, expectedVersion?: number): Promise<ApiResult<StoredWorkspace>> {
+    return this.saveParticipantWorkspaceSync(sessionId, payload, participantToken, expectedVersion);
+  }
+
+  saveParticipantWorkspaceSync(sessionId: string, payload: string, participantToken: string, expectedVersion?: number): ApiResult<StoredWorkspace> {
     const participant = this.store.findParticipantByTokenHash(hashToken(participantToken));
     if (!participant || participant.sessionId !== sessionId) return fail("FORBIDDEN", "Invalid participant token");
     try {
-      return { ok: true, data: this.coursework.saveWorkspace(participant.id, payload, expectedVersion) };
+      const saved = this.coursework.saveWorkspace(participant.id, payload, expectedVersion);
+      this.hub?.publish(sessionId, { type: "workspace_projection_updated", payload: { participant_id: participant.id, version: saved.topology.version } });
+      return { ok: true, data: saved };
     } catch (error) {
       return fail(this.errorCode(error), this.publicMessage(error));
     }
@@ -115,7 +132,12 @@ export class ClassroomApi {
     const participant = this.store.findParticipantByTokenHash(hashToken(participantToken));
     if (!participant || participant.sessionId !== sessionId) return fail("FORBIDDEN", "Invalid participant token");
     try {
-      return { ok: true, data: this.coursework.submitWorkspace(participant.id, payload, submissionKey, expectedVersion) };
+      const submission = this.coursework.submitWorkspace(participant.id, payload, submissionKey, expectedVersion);
+      this.hub?.publish(sessionId, {
+        type: "submission_evaluated",
+        payload: { participant_id: participant.id, score: submission.evaluation.score, status: submission.evaluation.status, workspace_version: submission.workspaceVersion },
+      });
+      return { ok: true, data: submission };
     } catch (error) {
       return fail(this.errorCode(error), this.publicMessage(error));
     }
@@ -141,6 +163,32 @@ export class ClassroomApi {
     } catch (error) {
       return fail(this.errorCode(error), this.publicMessage(error));
     }
+  }
+
+  snapshotData(sessionId: string): Snapshot | undefined {
+    const session = this.store.getSession(sessionId);
+    if (!session) return undefined;
+    return this.buildSnapshot(sessionId);
+  }
+
+  isAuthorized(sessionId: string, actor: Actor): boolean {
+    const session = this.store.getSession(sessionId);
+    if (!session) return false;
+    if (actor.role === "host") return authorizeRequest(session, hashToken(actor.token), "host");
+    const participant = this.store.findParticipantByTokenHash(hashToken(actor.token));
+    return Boolean(participant && participant.sessionId === sessionId && authorizeParticipant(participant.joinTokenHash, hashToken(actor.token)));
+  }
+
+  participantIdFor(sessionId: string, token: string): string | undefined {
+    const participant = this.store.findParticipantByTokenHash(hashToken(token));
+    return participant && participant.sessionId === sessionId ? participant.id : undefined;
+  }
+
+  touchParticipant(sessionId: string, participantToken: string): boolean {
+    const participant = this.store.findParticipantByTokenHash(hashToken(participantToken));
+    if (!participant || participant.sessionId !== sessionId) return false;
+    this.store.touchParticipant(sessionId, participant.id);
+    return true;
   }
 
   private isParticipantAuthorized(sessionId: string, token: string): boolean {
