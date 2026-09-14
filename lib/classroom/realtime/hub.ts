@@ -29,7 +29,17 @@ export type SnapshotPayload = {
 type Listener = (event: RealtimeEvent) => void;
 
 export class RealtimeHub {
-  private readonly sessions = new Map<string, { sequence: number; events: RealtimeEvent[]; listeners: Set<Listener> }>();
+ private readonly sessions = new Map<string, { sequence: number; events: RealtimeEvent[]; listeners: Set<Listener> }>();
+
+ diagnostics() {
+ let bufferedEvents = 0;
+ let subscribers = 0;
+ for (const entry of this.sessions.values()) {
+ bufferedEvents += entry.events.length;
+ subscribers += entry.listeners.size;
+ }
+ return { channels: this.sessions.size, bufferedEvents, subscribers };
+ }
   private readonly now: () => number;
 
   constructor(options: { now?: () => number } = {}) {

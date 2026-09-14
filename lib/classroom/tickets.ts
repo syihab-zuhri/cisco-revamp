@@ -12,7 +12,11 @@ export type RealtimeTicket = {
 const TICKET_TTL_MS = 10_000;
 
 export class TicketStore {
-  private readonly tickets = new Map<string, RealtimeTicket>();
+ private readonly tickets = new Map<string, RealtimeTicket>();
+
+ diagnostics() {
+ return { outstandingTickets: this.tickets.size };
+ }
   private readonly now: () => number;
   private readonly ttlMs: number;
 

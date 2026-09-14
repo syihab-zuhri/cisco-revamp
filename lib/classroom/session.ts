@@ -32,9 +32,9 @@ type JoinOptions = { classCode: string; nickname: string; joinToken: string };
 type StoreOptions = Clock & { sessionTtlMs?: number; hostGraceMs?: number };
 
 export class ClassroomSessionStore {
-  private readonly sessions = new Map<string, ClassSession>();
-  private readonly participants = new Map<string, ParticipantSession>();
-  private readonly now: () => number;
+ private readonly sessions = new Map<string, ClassSession>();
+ private readonly participants = new Map<string, ParticipantSession>();
+ private readonly now: () => number;
   private readonly sessionTtlMs: number;
   private readonly hostGraceMs: number;
 
@@ -102,9 +102,16 @@ export class ClassroomSessionStore {
   }
 
   listParticipants(sessionId: string): ParticipantSession[] {
-    return [...this.participants.values()]
-      .filter((participant) => participant.sessionId === sessionId)
-      .map((participant) => clone(participant));
+  return [...this.participants.values()]
+  .filter((participant) => participant.sessionId === sessionId)
+  .map((participant) => clone(participant));
+  }
+
+  diagnostics() {
+  return {
+  activeSessions: this.sessions.size,
+  trackedParticipants: this.participants.size,
+  };
   }
 
   requireMutableSessionView(sessionId: string): ClassSession {

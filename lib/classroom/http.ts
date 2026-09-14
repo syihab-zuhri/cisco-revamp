@@ -44,6 +44,22 @@ export function publishToSession(sessionId: string, type: RealtimeEventType, pay
   runtime().hub.publish(sessionId, { type, payload });
 }
 
+export function classroomDiagnostics() {
+  const r = runtime();
+  const store = r.store.diagnostics();
+  const hub = r.hub.diagnostics();
+  const tickets = r.tickets.diagnostics();
+  return {
+    sessionStoreReachable: true,
+    realtimeHubReachable: true,
+    activeSessions: store.activeSessions,
+    activeParticipants: store.trackedParticipants,
+    bufferedEvents: hub.bufferedEvents,
+    subscribers: hub.subscribers,
+    outstandingTickets: tickets.outstandingTickets,
+  };
+}
+
 export function bearerToken(request: Request): string | undefined {
   const header = request.headers.get("authorization");
   if (!header?.startsWith("Bearer ")) return undefined;

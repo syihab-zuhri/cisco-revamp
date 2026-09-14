@@ -92,14 +92,16 @@ export class ClassroomApi {
   }
 
   async startExercise(sessionId: string, exerciseId: string, hostToken: string): Promise<ApiResult<StoredExercise>> {
-    const session = this.store.getSession(sessionId);
-    if (!session) return fail("NOT_FOUND", "Session not found");
-    if (!authorizeRequest(session, hashToken(hostToken), "host")) return fail("FORBIDDEN", "Host authorization required");
-    try {
-      return { ok: true, data: this.coursework.startExercise(sessionId, exerciseId) };
-    } catch (error) {
-      return fail(this.errorCode(error), this.publicMessage(error));
-    }
+  const session = this.store.getSession(sessionId);
+  if (!session) return fail("NOT_FOUND", "Session not found");
+  if (!authorizeRequest(session, hashToken(hostToken), "host")) return fail("FORBIDDEN", "Host authorization required");
+  try {
+  const started = this.coursework.startExercise(sessionId, exerciseId);
+  this.hub?.publish(sessionId, { type: "exercise_started", payload: { exercise_id: started.id, title: started.exercise.title } });
+  return { ok: true, data: started };
+  } catch (error) {
+  return fail(this.errorCode(error), this.publicMessage(error));
+  }
   }
 
   async getActiveExercise(sessionId: string, actor: Actor): Promise<ApiResult<StoredExercise | null>> {
